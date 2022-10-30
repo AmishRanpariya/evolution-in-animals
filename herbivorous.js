@@ -270,8 +270,8 @@ class Herbivorous {
 			line(0, 0, 0, -this.dna[1] * 25);
 
 			// Circle and line for reproduction rate
-			stroke(0, 200, 255);
-			ellipse(0, 0, this.dna[4] * 100000);
+			// stroke(0, 200, 255);
+			// ellipse(0, 0, this.dna[4] * 100000);
 		}
 
 		// Draw the vehicle itself

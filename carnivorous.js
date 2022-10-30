@@ -262,10 +262,10 @@ class Carnivorous {
 		if (isDebugging) {
 			noFill();
 
-			// Circle and line for food
+			// Circle and line for herbi
 			stroke(0, 255, 0, 100);
-			ellipse(0, 0, this.dna[2] * 2);
-			line(0, 0, 0, -this.dna[0] * 25);
+			ellipse(0, 0, this.dna[6] * 2);
+			line(0, 0, 0, -this.dna[5] * 25);
 
 			// Circle and line for poison
 			stroke(255, 0, 0, 100);
@@ -273,8 +273,8 @@ class Carnivorous {
 			line(0, 0, 0, -this.dna[1] * 25);
 
 			// Circle and line for reproduction rate
-			stroke(0, 200, 255);
-			ellipse(0, 0, this.dna[4] * 100000);
+			// stroke(0, 200, 255);
+			// ellipse(0, 0, this.dna[4] * 100000);
 		}
 
 		// Draw the vehicle itself
