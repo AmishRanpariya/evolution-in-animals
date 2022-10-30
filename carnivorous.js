@@ -1,5 +1,5 @@
 class Carnivorous {
-	constructor(x, y, dna) {
+	constructor(x, y, dna, brain) {
 		// All the physics stuff
 		this.acceleration = createVector();
 		this.velocity = p5.Vector.random2D();
@@ -10,6 +10,16 @@ class Carnivorous {
 		this.velocity.setMag(this.maxspeed);
 
 		this.age = 1;
+		this.childrenCount = 0;
+
+		this.fitness = 0;
+		this.brain = null;
+		if (brain) {
+			this.brain = brain.copy();
+		} else {
+			this.brain = new NeuralNetwork(6, 9, 1);
+		}
+
 		// Did it receive DNA to copy?
 		if (dna instanceof Array) {
 			this.dna = [];
@@ -22,13 +32,13 @@ class Carnivorous {
 						this.dna[i] = dna[i] + random(-0.2, 0.2);
 					} else if (i < 4) {
 						// Adjust perception radius
-						this.dna[i] = constrain(dna[i] + random(-50, 50), 0, 100);
+						this.dna[i] = constrain(dna[i] + random(-10, 10), 0, 100);
 					} else if (i == 5) {
 						// Adjust steering force weights
 						this.dna[i] = dna[i] + random(-0.2, 0.2);
 					} else if (i == 6) {
 						// Adjust perception radius
-						this.dna[i] = constrain(dna[i] + random(-50, 50), 0, 100);
+						this.dna[i] = constrain(dna[i] + random(-10, 10), 0, 100);
 					} else {
 						// Adjust reproduction rate
 						this.dna[i] = constrain(
@@ -49,13 +59,15 @@ class Carnivorous {
 		} else {
 			let maxf = 3;
 			// DNA
-			// 0: Attraction/Repulsion to herbivorous
+			// 0: Attraction/Repulsion to deadAnimal
 			// 1: Attraction/Repulsion to poison
-			// 2: Radius to sense herb
+			// 2: Radius to sense dead
 			// 3: Radius to sense poison
 			// 4: Rate of reproduction
 			// 5: Attraction/Repulsion to herbvorous
 			// 6: Radius to sense herbvorous
+
+			const idealDna = [maxf, -maxf, 80, 5, CARN_REPRODUCTION_RANGE, maxf, 100];
 			this.dna = [
 				random(-maxf, maxf),
 				random(-maxf, maxf),
@@ -90,19 +102,40 @@ class Carnivorous {
 		return this.health <= 0;
 	}
 
+	mutate() {
+		this.brain.mutate(0.1);
+	}
+
 	// Small chance of returning a new child vehicle
-	birth() {
+	birth(herbPop, carnPop, deads) {
 		let r = random(1);
+
+		const res = this.brain.predict([
+			SigmoidMapping(this.age),
+			this.health,
+			SigmoidMapping(herbPop),
+			SigmoidMapping(carnPop),
+			SigmoidMapping(deads),
+			SigmoidMapping(this.childrenCount),
+		]);
 		if (
-			r < this.dna[4] * mapper(this.age, 3) &&
+			r < this.dna[4] &&
+			res[0] > 0.5 &&
+			// r < this.dna[4] * SigmoidMapping(this.age) &&
 			this.age > CARN_MIN_AGE_TO_REPRODUCE &&
 			this.health > 0.5
 		) {
 			// so parent's health will reduce do to reproduction
 			this.health -= HEALTH_REDUCTION_DUE_TO_REPRODUCTION_IN_CARNIVOROUS;
-
+			this.childrenCount++;
 			// Same location, same DNA
-			return new Carnivorous(this.position.x, this.position.y, this.dna);
+			const newChild = new Carnivorous(
+				this.position.x,
+				this.position.y,
+				this.dna
+			);
+			newChild.mutate();
+			return newChild;
 		}
 	}
 

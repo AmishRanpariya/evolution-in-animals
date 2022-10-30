@@ -9,9 +9,6 @@ let poison = [];
 // An array of "deads"
 let deads = [];
 
-// How good is food, how bad is poison?
-let nutrition = [0.1, -0.5];
-
 // Show additional info on DNA?
 let isDebugging = false;
 
@@ -26,21 +23,11 @@ let noOfCarnPopDied = 0;
 let noOfCarnPopnBorn = 0;
 
 let data = [];
-function setup() {
-	// Add canvas and grab checkbox
-	createCanvas(1080, 600);
-	angleMode(RADIANS);
 
-	// Create 10 herbivorous
-	for (let i = 0; i < 50; i++) {
-		herbivorousPopulation.push(new Herbivorous(random(width), random(height)));
-	}
+let deadHerbs = [];
+let deadCarns = [];
 
-	// Create 10 carnivorous
-	for (let i = 0; i < 10; i++) {
-		carnivorousPopulation.push(new Carnivorous(random(width), random(height)));
-	}
-
+function initializeFood() {
 	// Start with some food
 	for (let i = 0; i < 100; i++) {
 		grass.push(new Food(random(width), random(height), FOOD_TYPE.GRASS));
@@ -52,6 +39,49 @@ function setup() {
 	}
 }
 
+function setup() {
+	// Add canvas and grab checkbox
+	createCanvas(1080, 600);
+	angleMode(RADIANS);
+
+	const bestHerbBrainString = localStorage.getItem("BestHerbBrain") || null;
+	const bestHerbDNA = localStorage.getItem("BestHerbDNA");
+	const bestCarnBrainString = localStorage.getItem("BestCarnBrain") || null;
+	const bestCarnDNA = localStorage.getItem("BestCarnDNA");
+
+	let bestHerbBrain = bestHerbBrainString
+		? NeuralNetwork.deserialize(bestHerbBrainString)
+		: null;
+
+	let bestCarnBrain = bestCarnBrainString
+		? NeuralNetwork.deserialize(bestCarnBrainString)
+		: null;
+
+	// Create 10 herbivorous
+	for (let i = 0; i < INITIAL_HERB_COUNT; i++) {
+		herbivorousPopulation.push(
+			new Herbivorous(
+				random(width),
+				random(height),
+				bestHerbDNA ? JSON.parse(bestHerbDNA) : null,
+				bestHerbBrain
+			)
+		);
+	}
+	// Create 10 carnivorous
+	for (let i = 0; i < INITIAL_CARN_COUNT; i++) {
+		carnivorousPopulation.push(
+			new Carnivorous(
+				random(width),
+				random(height),
+				bestCarnDNA ? JSON.parse(bestCarnDNA) : null,
+				bestCarnBrain
+			)
+		);
+	}
+	initializeFood();
+}
+
 // Add new vehicles by dragging mouse
 function mouseDragged() {
 	herbivorousPopulation.push(new Herbivorous(mouseX, mouseY));
@@ -59,6 +89,11 @@ function mouseDragged() {
 
 function draw() {
 	clear();
+
+	if (herbivorousPopulation.length == 0 || carnivorousPopulation.length == 0) {
+		nextGeneration();
+		return;
+	}
 
 	for (let c = 0; c < speed; c++) {
 		// x% chance of new food
@@ -96,6 +131,7 @@ function draw() {
 			// If the vehicle has died, remove
 			if (h.dead()) {
 				noOfHerbPopDied++;
+				deadHerbs.push(h);
 
 				deads.push(new Food(h.position.x, h.position.y, FOOD_TYPE.DEADANIMAL));
 
@@ -105,9 +141,7 @@ function draw() {
 				let child = h.birth(
 					herbivorousPopulation.length,
 					carnivorousPopulation.length,
-					grass.length,
-					poison.length,
-					deads.length
+					grass.length
 				);
 				if (child != null) {
 					herbivorousPopulation.push(child);
@@ -136,11 +170,17 @@ function draw() {
 			// If the vehicle has died, remove
 			if (v.dead()) {
 				noOfCarnPopDied++;
+				deadCarns.push(v);
+				grass.push(new Food(v.position.x, v.position.y, FOOD_TYPE.GRASS));
 
 				carnivorousPopulation.splice(i, 1);
 			} else {
 				// Every vehicle has a chance of cloning itself
-				let child = v.birth();
+				let child = v.birth(
+					herbivorousPopulation.length,
+					carnivorousPopulation.length,
+					deads.length
+				);
 				if (child != null) {
 					carnivorousPopulation.push(child);
 					noOfCarnPopnBorn++;
@@ -429,7 +469,7 @@ function draw() {
 			Plot.plot({
 				height: "300",
 				width: "500",
-				caption: `Perception Carn: GREEN-grass, RED-poison, PURPLE-herbivorous`,
+				caption: `Perception Carn: GREEN-deadAnimal, RED-poison, PURPLE-herbivorous`,
 				marks: [
 					Plot.line(data, {
 						x: "time",
@@ -482,6 +522,18 @@ function keyPressed() {
 		// 0 of numpade
 		speed = 1;
 		return false; // prevent any default behaviour
+	} else if (keyCode == 67) {
+		// c key
+		localStorage.removeItem("BestHerbBrain");
+		localStorage.removeItem("BestHerbDNA");
+		localStorage.removeItem("BestCarnBrain");
+		localStorage.removeItem("BestCarnDNA");
+
+		return false; // prevent any default behaviour
+	} else if (keyCode == 82) {
+		// r key
+		nextGeneration();
+		return false; // prevent any default behaviour
 	} else if (keyCode == 83) {
 		if (document.querySelector("svg")) {
 			document.body.removeChild(document.querySelector("svg"));
@@ -497,4 +549,110 @@ function keyPressed() {
 
 		return false; // prevent any default behaviour
 	}
+}
+
+function calfitness() {
+	let sum = 0;
+	for (let i of deadHerbs) {
+		sum +=
+			(i.age * i.age + i.childrenCount * 10000 + (i.dead() ? 0 : 20000)) / 1000;
+	}
+	for (let i of deadHerbs) {
+		i.fitness =
+			(i.age * i.age + i.childrenCount * 10000 + (i.dead() ? 0 : 20000)) /
+			1000 /
+			sum;
+	}
+	sum = 0;
+	for (let i of deadCarns) {
+		sum +=
+			(i.age * i.age + i.childrenCount * 10000 + (i.dead() ? 0 : 20000)) / 1000;
+	}
+	for (let i of deadCarns) {
+		i.fitness =
+			(i.age * i.age + i.childrenCount * 10000 + (i.dead() ? 0 : 20000)) /
+			1000 /
+			sum;
+	}
+}
+
+function nextGeneration() {
+	deadCarns = [...deadCarns, ...carnivorousPopulation];
+	deadHerbs = [...deadHerbs, ...herbivorousPopulation];
+	console.log(
+		"Next Generation",
+		iterationCount,
+		herbivorousPopulation.length > 0 ? "Herbivorous Won" : "Carnivorous Won"
+	);
+
+	herbivorousPopulation = [];
+	carnivorousPopulation = [];
+	grass = [];
+	poison = [];
+	deads = [];
+
+	calfitness();
+	for (let i = 0; i < INITIAL_HERB_COUNT; i++) {
+		herbivorousPopulation[i] = pickOneHerb(deadHerbs);
+	}
+	for (let i = 0; i < INITIAL_CARN_COUNT; i++) {
+		carnivorousPopulation[i] = pickOneCarn(deadCarns);
+	}
+
+	const bestHerb = deadHerbs.reduce(
+		(a, c) => (a.fitness < c.fitness ? c : a),
+		deadHerbs[0]
+	);
+	storeBestBrain(bestHerb, "BestHerbBrain");
+	storeBestDNA(bestHerb, "BestHerbDNA");
+	const bestCarn = deadCarns.reduce(
+		(a, c) => (a.fitness < c.fitness ? c : a),
+		deadCarns[0]
+	);
+	storeBestBrain(bestCarn, "BestCarnBrain");
+	storeBestDNA(bestCarn, "BestCarnDNA");
+
+	deadHerbs = [];
+	deadCarns = [];
+	data = [];
+	initializeFood();
+	iterationCount = 0;
+}
+
+function pickOneHerb(arr) {
+	let index = 0;
+	let r = random(1);
+	while (r > 0) {
+		r = r - arr[index].fitness;
+		index++;
+	}
+	index--;
+
+	let b = arr[index];
+	let child = new Herbivorous(random(width), random(height), b.dna, b.brain);
+	child.mutate();
+	return child;
+}
+
+function pickOneCarn(arr) {
+	let index = 0;
+	let r = random(1);
+	while (r > 0) {
+		r = r - arr[index].fitness;
+		index++;
+	}
+	index--;
+
+	let b = arr[index];
+	let child = new Carnivorous(random(width), random(height), b.dna, b.brain);
+	child.mutate();
+	return child;
+}
+
+function storeBestBrain(best, key) {
+	localStorage.setItem(key, best.brain.serialize());
+}
+
+function storeBestDNA(best, key) {
+	localStorage.setItem(key, JSON.stringify(best.dna));
 }

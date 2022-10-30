@@ -9,7 +9,7 @@ class Food {
 		if (type == FOOD_TYPE.GRASS) {
 			this.nutrition = 0.1;
 		} else if (type == FOOD_TYPE.POISON) {
-			this.nutrition = -0.5;
+			this.nutrition = -1;
 		} else if (type == FOOD_TYPE.DEADANIMAL) {
 			this.nutrition = 0.1;
 		}
@@ -22,7 +22,7 @@ class Food {
 			// dead animal slowly rots
 			this.health -= 0.002;
 			if (this.health <= 0) {
-				this.nutrition = -0.5;
+				this.nutrition = -1;
 				this.color = FOOD_TYPE.POISON;
 				this.type = FOOD_TYPE.POISON;
 			}

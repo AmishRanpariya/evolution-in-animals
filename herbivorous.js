@@ -10,11 +10,14 @@ class Herbivorous {
 		this.velocity.setMag(this.maxspeed);
 
 		this.age = 1;
+		this.childrenCount = 0;
+
+		this.fitness = 0;
 		this.brain = null;
 		if (brain) {
 			this.brain = brain.copy();
 		} else {
-			this.brain = new NeuralNetwork(8, 8, 1);
+			this.brain = new NeuralNetwork(6, 9, 1);
 		}
 
 		// Did it receive DNA to copy?
@@ -29,13 +32,13 @@ class Herbivorous {
 						this.dna[i] = dna[i] + random(-0.2, 0.2);
 					} else if (i < 4) {
 						// Adjust perception radius
-						this.dna[i] = constrain(dna[i] + random(-50, 50), 0, 100);
+						this.dna[i] = constrain(dna[i] + random(-10, 10), 0, 100);
 					} else if (i == 5) {
 						// Adjust steering force weights
 						this.dna[i] = dna[i] + random(-0.2, 0.2);
 					} else if (i == 6) {
 						// Adjust perception radius
-						this.dna[i] = constrain(dna[i] + random(-50, 50), 0, 100);
+						this.dna[i] = constrain(dna[i] + random(-10, 10), 0, 100);
 					} else {
 						// Adjust reproduction rate
 						this.dna[i] = constrain(
@@ -63,6 +66,15 @@ class Herbivorous {
 			// 4: Rate of reproduction
 			// 5: Attraction/Repulsion to carnivorous
 			// 6: Radius to sense carnivorous
+			const idealDna = [
+				maxf,
+				-maxf,
+				100,
+				5,
+				HERB_REPRODUCTION_RANGE,
+				-maxf,
+				80,
+			];
 			this.dna = [
 				random(-maxf, maxf),
 				random(-maxf, maxf),
@@ -102,30 +114,29 @@ class Herbivorous {
 	}
 
 	// Small chance of returning a new child vehicle
-	birth(herbPop, carnPop, foods, poisons, deads) {
+	birth(herbPop, carnPop, foods) {
 		var r = random(1);
 
-		// const res = this.brain.predict([
-		// 	this.dna[4],
-		// 	this.age,
-		// 	this.health,
-		// 	herbPop,
-		// 	carnPop,
-		// 	foods,
-		// 	poisons,
-		// 	deads,
-		// ]);
+		const res = this.brain.predict([
+			SigmoidMapping(this.age),
+			this.health,
+			SigmoidMapping(herbPop),
+			SigmoidMapping(carnPop),
+			SigmoidMapping(foods),
+			SigmoidMapping(this.childrenCount),
+		]);
 
 		if (
-			// r < this.dna[4] &&
-			// res[0] > 0.85 &&
-			r < this.dna[4] * mapper(this.age, 3) &&
+			r < this.dna[4] &&
+			res[0] > 0.5 &&
+			// r < this.dna[4] * SigmoidMapping(this.age) &&
 			this.age > HERB_MIN_AGE_TO_REPRODUCE &&
 			this.health > 0.5
 		) {
 			// so parent's health will reduce do to reproduction
 			this.health -= HEALTH_REDUCTION_DUE_TO_REPRODUCTION_IN_HERBIVOROUS;
 
+			this.childrenCount++;
 			// Same location, same DNA
 			let newChild = new Herbivorous(
 				this.position.x,
