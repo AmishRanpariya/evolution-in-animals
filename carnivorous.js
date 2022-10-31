@@ -11,6 +11,7 @@ class Carnivorous {
 
 		this.age = 1;
 		this.childrenCount = 0;
+		this.lastReproductionAge = 0;
 
 		this.fitness = 0;
 		this.brain = null;
@@ -119,14 +120,16 @@ class Carnivorous {
 			SigmoidMapping(this.childrenCount),
 		]);
 		if (
-			r < this.dna[4] &&
+			// r < this.dna[4] &&
 			res[0] > 0.5 &&
 			// r < this.dna[4] * SigmoidMapping(this.age) &&
 			this.age > CARN_MIN_AGE_TO_REPRODUCE &&
+			this.age - this.lastReproductionAge > 20 &&
 			this.health > 0.5
 		) {
 			// so parent's health will reduce do to reproduction
 			this.health -= HEALTH_REDUCTION_DUE_TO_REPRODUCTION_IN_CARNIVOROUS;
+			this.lastReproductionAge = this.age;
 			this.childrenCount++;
 			// Same location, same DNA
 			const newChild = new Carnivorous(
